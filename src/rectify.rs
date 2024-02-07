@@ -20,6 +20,17 @@ where
     seer: Seer<SC, StepT>,
 }
 
+impl<AC, SC, StepT> Default for Rectify<AC, SC, StepT>
+where
+    StepT: Deserialize,
+    AC: AssentCallback<StepT>,
+    SC: SeerCallback<StepT>,
+ {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<AC, SC, StepT> Rectify<AC, SC, StepT>
 where
     StepT: Deserialize,
@@ -50,11 +61,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use nimble_assent::AssentCallback;
-    use nimble_seer::SeerCallback;
     use nimble_steps::{Deserialize, ParticipantSteps, Step};
 
-    use crate::{Rectify, RectifyCallback};
+    use crate::{assent::AssentCallback, seer::SeerCallback};
 
     pub struct TestGame {
         pub position_x: i32,
