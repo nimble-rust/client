@@ -2,40 +2,38 @@
  *  Copyright (c) Peter Bjorklund. All rights reserved. https://github.com/nimble-rust/client
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------------------*/
-use crate::assent::{Assent, AssentCallback, UpdateState};
-use crate::seer::{Seer, SeerCallback};
+use crate::assent::{Assent, UpdateState};
+use crate::seer::Seer;
+use crate::transmute::TransmuteCallback;
 use nimble_steps::Deserialize;
 
 pub trait RectifyCallback {
     fn on_copy_from_authoritative(&mut self);
 }
 
-pub struct Rectify<AC, SC, StepT>
+pub struct Rectify<AC, StepT>
 where
     StepT: Deserialize,
-    AC: AssentCallback<StepT>,
-    SC: SeerCallback<StepT>,
+    AC: TransmuteCallback<StepT>,
 {
     assent: Assent<AC, StepT>,
-    seer: Seer<SC, StepT>,
+    seer: Seer<AC, StepT>,
 }
 
-impl<AC, SC, StepT> Default for Rectify<AC, SC, StepT>
+impl<AC, StepT> Default for Rectify<AC, StepT>
 where
     StepT: Deserialize,
-    AC: AssentCallback<StepT>,
-    SC: SeerCallback<StepT>,
- {
+    AC: TransmuteCallback<StepT>,
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<AC, SC, StepT> Rectify<AC, SC, StepT>
+impl<AC, StepT> Rectify<AC, StepT>
 where
     StepT: Deserialize,
-    AC: AssentCallback<StepT>,
-    SC: SeerCallback<StepT>,
+    AC: TransmuteCallback<StepT>,
 {
     pub fn new() -> Self {
         let assent = Assent::new();
@@ -46,16 +44,16 @@ where
 
     pub fn update(
         &mut self,
-        mut callback: impl RectifyCallback,
-        mut ac_callback: AC,
-        mut sc_callback: SC,
+        //      callback: &mut impl RectifyCallback,
+        ac_callback: &mut AC,
+        sc_callback: &mut AC,
     ) {
-        let consumed_all_knowledge = self.assent.update(&mut ac_callback);
+        let consumed_all_knowledge = self.assent.update(ac_callback);
         if consumed_all_knowledge == UpdateState::ConsumedAllKnowledge {
-            callback.on_copy_from_authoritative();
+            //callback.on_copy_from_authoritative();
         }
 
-        self.seer.update(&mut sc_callback);
+        self.seer.update(sc_callback);
     }
 }
 
@@ -63,7 +61,9 @@ where
 mod tests {
     use nimble_steps::{Deserialize, ParticipantSteps, Step};
 
-    use crate::{assent::AssentCallback, seer::SeerCallback};
+    use crate::{rectify::Rectify, transmute::TransmuteCallback};
+
+    use super::RectifyCallback;
 
     pub struct TestGame {
         pub position_x: i32,
@@ -94,14 +94,12 @@ mod tests {
         }
     }
 
-    impl AssentCallback<TestGameStep> for TestCallback {
+    impl TransmuteCallback<TestGameStep> for TestGame {
         fn on_tick(&mut self, steps: &ParticipantSteps<TestGameStep>) {
             for step in steps.steps.iter() {
                 match step.step {
-                    Step::Custom(TestGameStep::MoveLeft) => self.authoritative_game.position_x -= 1,
-                    Step::Custom(TestGameStep::MoveRight) => {
-                        self.authoritative_game.position_x += 1
-                    }
+                    Step::Custom(TestGameStep::MoveLeft) => self.position_x -= 1,
+                    Step::Custom(TestGameStep::MoveRight) => self.position_x += 1,
                     Step::Forced => todo!(),
                     Step::WaitingForReconnect => todo!(),
                 }
@@ -109,37 +107,17 @@ mod tests {
         }
     }
 
-    impl SeerCallback<TestGameStep> for TestCallback {
-        fn on_tick(&mut self, step: &ParticipantSteps<TestGameStep>) {
-            let first = step.steps.first().unwrap();
-            match &first.step {
-                Step::Custom(game_step) => match game_step {
-                    TestGameStep::MoveLeft => {
-                        self.predicted_game.position_x -= 1;
-                    }
-                    TestGameStep::MoveRight => {
-                        self.predicted_game.position_x += 1;
-                    }
-                },
-                _ => {}
-            }
-        }
-
-        fn on_copy_from_authoritative(&mut self) {
-            println!("on_copy_from_authoritative");
-        }
-    }
-
     #[test]
-    fn it_works() {
+    fn verify_rectify() {
         let authoritative_game = TestGame { position_x: -44 };
         let predicted_game = TestGame { position_x: -44 };
-        let callbacks = TestCallback {
-            authoritative_game,
-            predicted_game,
+        let mut callbacks = TestCallback {
+            authoritative_game: authoritative_game,
+            predicted_game: predicted_game,
         };
         let mut rectify = Rectify::new();
-        rectify.update(callbacks, authoritative_game, predicted_game);
-        assert_eq!(authoritative_game.position_x, -43);
+        rectify.update(&mut callbacks.authoritative_game, &mut callbacks.predicted_game);
+
+        assert_eq!(callbacks.authoritative_game.position_x, -43);
     }
 }

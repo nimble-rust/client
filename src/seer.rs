@@ -2,21 +2,14 @@
  *  Copyright (c) Peter Bjorklund. All rights reserved. https://github.com/nimble-rust/client
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------------------*/
+use crate::transmute::TransmuteCallback;
 use nimble_steps::{Deserialize, ParticipantStep, ParticipantSteps, Step, Steps};
 use std::marker::PhantomData;
-
-pub trait SeerCallback<T> {
-    fn on_copy_from_authoritative(&mut self);
-
-    fn on_tick(&mut self, step: &ParticipantSteps<T>);
-
-    fn on_post_ticks(&mut self) {}
-}
 
 // Define the Assent struct
 impl<C, StepT> Default for Seer<C, StepT>
 where
-    C: SeerCallback<StepT>,
+    C: TransmuteCallback<StepT>,
     StepT: Deserialize,
 {
     fn default() -> Self {
@@ -26,7 +19,7 @@ where
 
 pub struct Seer<C, StepT>
 where
-    C: SeerCallback<StepT>,
+    C: TransmuteCallback<StepT>,
     StepT: Deserialize,
 {
     steps: Steps<StepT>,
@@ -36,7 +29,7 @@ where
 
 impl<C, StepT> Seer<C, StepT>
 where
-    C: SeerCallback<StepT>,
+    C: TransmuteCallback<StepT>,
     StepT: Deserialize,
 {
     pub fn new() -> Self {
@@ -93,7 +86,7 @@ mod tests {
         }
     }
 
-    impl SeerCallback<TestGameStep> for TestGame {
+    impl TransmuteCallback<TestGameStep> for TestGame {
         fn on_tick(&mut self, step: &ParticipantSteps<TestGameStep>) {
             let first = step.steps.first().unwrap();
             match &first.step {
@@ -109,9 +102,9 @@ mod tests {
             }
         }
 
-        fn on_copy_from_authoritative(&mut self) {
-            println!("on_copy_from_authoritative");
-        }
+        fn on_pre_ticks(&mut self) {}
+
+        fn on_post_ticks(&mut self) {}
     }
 
     #[test]

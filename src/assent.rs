@@ -2,14 +2,9 @@
  *  Copyright (c) Peter Bjorklund. All rights reserved. https://github.com/nimble-rust/client
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------------------*/
+use crate::transmute::TransmuteCallback;
 use nimble_steps::{Deserialize, ParticipantSteps, Step, Steps};
 use std::marker::PhantomData;
-
-pub trait AssentCallback<StepT: Deserialize> {
-    fn on_pre_ticks(&mut self) {}
-
-    fn on_tick(&mut self, step: &ParticipantSteps<StepT>);
-}
 
 #[derive(Debug, PartialEq)]
 pub enum UpdateState {
@@ -21,7 +16,7 @@ pub enum UpdateState {
 pub struct Assent<C, StepT>
 where
     StepT: Deserialize,
-    C: AssentCallback<StepT>,
+    C: TransmuteCallback<StepT>,
 {
     phantom: PhantomData<C>,
     steps: Steps<StepT>,
@@ -30,7 +25,7 @@ where
 impl<C, StepT> Default for Assent<C, StepT>
 where
     StepT: Deserialize,
-    C: AssentCallback<StepT>,
+    C: TransmuteCallback<StepT>,
 {
     fn default() -> Self {
         Assent::new()
@@ -40,7 +35,7 @@ where
 impl<C, StepT> Assent<C, StepT>
 where
     StepT: Deserialize,
-    C: AssentCallback<StepT>,
+    C: TransmuteCallback<StepT>,
 {
     pub fn new() -> Self {
         Assent {
@@ -87,7 +82,7 @@ mod tests {
         }
     }
 
-    impl AssentCallback<TestGameStep> for TestGame {
+    impl TransmuteCallback<TestGameStep> for TestGame {
         fn on_tick(&mut self, steps: &ParticipantSteps<TestGameStep>) {
             for step in steps.steps.iter() {
                 match step.step {
